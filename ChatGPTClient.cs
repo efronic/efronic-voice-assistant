@@ -2,6 +2,8 @@ using System.Net.Http;
 using System.Text.Json;
 using System.Text;
 using System.Threading.Tasks;
+using System.Net.Http.Json;
+
 
 public class ChatGPTClient
 {
@@ -9,37 +11,50 @@ public class ChatGPTClient
     private readonly string _apiKey;
     private readonly string _model;
 
-    public ChatGPTClient(string apiKey, string model = "gpt-4")
+    public ChatGPTClient(string baseAddress, string apiKey, string model = "gpt-4")
     {
-        _httpClient = new HttpClient();
         _apiKey = apiKey;
+        _httpClient = new HttpClient
+        {
+            BaseAddress = new Uri(baseAddress)
+        };
+        _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _apiKey);
         _model = model;
     }
 
-    public async Task<string> GetResponseAsync(string query)
+    public async Task<string> GetResponseAsync(string query, string prompt)
     {
-        string apiUrl = $"https://api.openai.com/v1/engines/{_model}/completions";
-        var requestContent = new
-        {
-            prompt = query,
-            max_tokens = 150
-        };
-        var content = new StringContent(JsonSerializer.Serialize(requestContent), Encoding.UTF8, "application/json");
-        _httpClient.DefaultRequestHeaders.Add("Authorization", "Bearer " + _apiKey);
+        try
+        {   
+            var response = await _httpClient.PostAsJsonAsync("completions", new
+            {
+                model = _model,
+                prompt,
+                max_tokens = 100
+            });
 
-        HttpResponseMessage response = await _httpClient.PostAsync(apiUrl, content);
-        response.EnsureSuccessStatusCode(); // Throw if not a success code.
+            response.EnsureSuccessStatusCode();
 
-        string responseString = await response.Content.ReadAsStringAsync();
-        var jsonResponse = JsonDocument.Parse(responseString);
-
-        if (jsonResponse.RootElement.TryGetProperty("choices", out JsonElement choicesElement) &&
-            choicesElement.GetArrayLength() > 0 &&
-            choicesElement[0].TryGetProperty("text", out JsonElement textElement))
-        {
-            return textElement.GetString() ?? "No response from ChatGPT.";
+            var responseString = await response.Content.ReadAsStringAsync();
+            var responseData = JsonSerializer.Deserialize<dynamic>(responseString);
+            if (responseData is not null)
+            {
+                return responseData.choices[0].text.ToString();
+            } 
+            else
+            {
+                throw new ApplicationException("An error occurred while processing the response.");
+            }
         }
-
-        return "No response from ChatGPT.";
+        catch (HttpRequestException httpEx)
+        {
+            // Log and handle HTTP request errors
+            throw new ApplicationException("An error occurred while communicating with the OpenAI API.", httpEx);
+        }
+        catch (Exception ex)
+        {
+            // Log and handle other errors
+            throw new ApplicationException("An unexpected error occurred while processing the request.", ex);
+        }
     }
 }
