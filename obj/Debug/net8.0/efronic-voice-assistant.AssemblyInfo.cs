@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("efronic-voice-assistant")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+0faaef7443f35e717e43f0133a3feca87731cfe0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+438b21346a188669052cd51b32f6f0439503e33e")]
 [assembly: System.Reflection.AssemblyProductAttribute("efronic-voice-assistant")]
 [assembly: System.Reflection.AssemblyTitleAttribute("efronic-voice-assistant")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
