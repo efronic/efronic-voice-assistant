@@ -2,9 +2,12 @@
 using System.Device.Gpio;
 using System.Net.Http;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Configuration;
 using System.Net.Http.Headers;
 using System.IO;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 partial class Program
 {
@@ -18,6 +21,7 @@ partial class Program
     private static AudioPlayer _audioPlayer;
     private static PicovoiceHandler _picovoiceHandler;
     private static WhisperClient _whisperClient;
+    public static IConfiguration Configuration { get; private set; }
     private static readonly string[] _prompts = {
         "How may I assist you?",
         "How may I help?",
@@ -33,6 +37,7 @@ partial class Program
     {
         try
         {
+            var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Development";
             // Initialize GPIO
             _gpioController = new GpioController();
             _gpioController.OpenPin(_led1Pin, PinMode.Output);
@@ -42,16 +47,38 @@ partial class Program
 
             // Load configuration
             var builder = new ConfigurationBuilder()
-                .AddJsonFile("appsettings.development.json", optional: true, reloadOnChange: true)
-                .AddEnvironmentVariables();
+                .SetBasePath(Directory.GetCurrentDirectory())
+                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true) // Base settings
+            .AddJsonFile($"appsettings.{environment}.json", optional: true, reloadOnChange: true) // Environment-specific settings
+            .AddEnvironmentVariables(); // Environment variables
 
-            IConfiguration configuration = builder.Build();
 
-            var openaiApiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY") ?? "OPENAI_API_KEY";
-            var gptModel = Environment.GetEnvironmentVariable("OPENAI_API_KEY") ?? "gpt-4";
-            var pvAccessKey = Environment.GetEnvironmentVariable("PV_ACCESS_KEY") ?? "PV_ACCESS_KEY";
-            var baseAddress = Environment.GetEnvironmentVariable("BASE_URL") ?? "https://api.openai.com/v1/";
-            var whisperApiUrl = Environment.GetEnvironmentVariable("WHISPER_API_URL") ?? "https://api.whisper.ai/v1/convert";
+            Configuration = builder.Build();
+
+            var host = Host.CreateDefaultBuilder(args)
+                        .ConfigureServices((context, services) =>
+                        {
+                            services.AddSingleton<IConfiguration>(Configuration);
+                            services.AddSingleton<ConfigurationReloader>();
+                        })
+                        .ConfigureLogging(logging =>
+                        {
+                            logging.AddConsole();
+                        })
+                        .Build();
+
+            var configReloader = host.Services.GetRequiredService<ConfigurationReloader>();
+            configReloader.StartListening();
+
+            await host.RunAsync();
+
+
+            var openaiApiKey = Configuration["OPENAI_API_KEY"] ?? "OPENAI_API_KEY";
+            var gptModel = Configuration["GPT_MODEL"] ?? "gpt-3.5-turbo-16k";
+            var pvAccessKey = Configuration["PV_ACCESS_KEY"] ?? "PV_ACCESS_KEY";
+            var baseAddress = Configuration["BASE_URL"] ?? "https://api.openai.com/v1/";
+            var whisperApiUrl = Configuration["WHISPER_API_URL"] ?? "https://api.whisper.ai/v1/convert";
+            var whisperModel = Configuration["WHISPER_MODEL"] ?? "whisper-1";
             // Initialize ChatGPTClient
             _chatGPTClient = new ChatGPTClient(baseAddress, openaiApiKey, gptModel);
 
@@ -66,7 +93,7 @@ partial class Program
             // Initialize Recorder and AudioPlayer
             _recorder = new AudioRecorder();
             _audioPlayer = new AudioPlayer();
-            _whisperClient = new WhisperClient(whisperApiUrl, openaiApiKey);
+            _whisperClient = new WhisperClient(whisperApiUrl, openaiApiKey, whisperModel);
             // Main loop to keep the application running
             Console.WriteLine("Application started. Press Ctrl+C to exit.");
             while (true)
@@ -110,7 +137,7 @@ partial class Program
             string transcript = await _whisperClient.ConvertPcmToTextAsync(pcmData); // This should be replaced with actual speech-to-text result
 
             // Get a response from ChatGPT
-            string response = await _chatGPTClient.GetResponseAsync(transcript, prompt);
+            string response = await _chatGPTClient.GetResponseAsync(transcript);
 
             // Play the response
             _audioPlayer.PlayMp3("speech.mp3");

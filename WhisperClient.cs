@@ -9,24 +9,33 @@ public class WhisperClient
     private readonly HttpClient _httpClient;
     private readonly string _whisperApiUrl;
     private readonly string _apiKey;
-
-    public WhisperClient(string whisperApiUrl, string apiKey)
+    private readonly string _model;
+    public WhisperClient(string whisperApiUrl, string apiKey, string model)
     {
         _httpClient = new HttpClient();
         _whisperApiUrl = whisperApiUrl;
         _apiKey = apiKey;
+        _model = model;
     }
 
     public async Task<string> ConvertPcmToTextAsync(short[] pcmData)
     {
         byte[] byteData = ConvertPcmToByteArray(pcmData);
 
-        using var content = new ByteArrayContent(byteData);
-        content.Headers.ContentType = new MediaTypeHeaderValue("audio/wav");
-        content.Headers.Add("Authorization", $"Bearer {_apiKey}");
+        // using var content = new ByteArrayContent(byteData);
+        // content.Headers.ContentType = new MediaTypeHeaderValue("audio/wav");
+        // content.Headers.Add("Authorization", $"Bearer {_apiKey}");
 
-        HttpResponseMessage response = await _httpClient.PostAsync(_whisperApiUrl, content);
+        // HttpResponseMessage response = await _httpClient.PostAsync(_whisperApiUrl, content);
+        using var multipartContent = new MultipartFormDataContent();
+        var byteContent = new ByteArrayContent(byteData);
+        byteContent.Headers.ContentType = new MediaTypeHeaderValue("audio/wav");
+        multipartContent.Add(byteContent, "file", "audio.wav");
+        multipartContent.Add(new StringContent(_model), "model");
 
+        _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
+        HttpResponseMessage response = await _httpClient.PostAsync(_whisperApiUrl, multipartContent);
+        
         response.EnsureSuccessStatusCode();
         var responseString = await response.Content.ReadAsStringAsync();
         var responseData = JsonSerializer.Deserialize<WhisperResponse>(responseString);

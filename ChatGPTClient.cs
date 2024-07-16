@@ -1,9 +1,7 @@
 using System.Net.Http;
 using System.Text.Json;
-using System.Text;
 using System.Threading.Tasks;
 using System.Net.Http.Json;
-
 
 public class ChatGPTClient
 {
@@ -22,16 +20,22 @@ public class ChatGPTClient
         _model = model;
     }
 
-    public async Task<string> GetResponseAsync(string query, string prompt)
+    public async Task<string> GetResponseAsync(string userMessage)
     {
         try
-        {   
-            var response = await _httpClient.PostAsJsonAsync("completions", new
+        {
+            var requestBody = new
             {
                 model = _model,
-                prompt,
+                messages = new[]
+                {
+                    new { role = "system", content = "You are a helpful assistant." },
+                    new { role = "user", content = userMessage }
+                },
                 max_tokens = 100
-            });
+            };
+
+            var response = await _httpClient.PostAsJsonAsync("v1/chat/completions", requestBody);
 
             response.EnsureSuccessStatusCode();
 
@@ -39,8 +43,8 @@ public class ChatGPTClient
             var responseData = JsonSerializer.Deserialize<dynamic>(responseString);
             if (responseData is not null)
             {
-                return responseData.choices[0].text.ToString();
-            } 
+                return responseData.choices[0].message.content.ToString();
+            }
             else
             {
                 throw new ApplicationException("An error occurred while processing the response.");
