@@ -21,7 +21,7 @@ public class SpeechSynthesizer
         {
             Text = text,
             OutputFormat = OutputFormat.Mp3,
-            VoiceId = VoiceId.Joanna
+            VoiceId = VoiceId.Ruth
         };
 
         var synthesizeSpeechResponse = await _pollyClient.SynthesizeSpeechAsync(synthesizeSpeechRequest);

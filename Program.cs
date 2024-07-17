@@ -13,7 +13,7 @@ partial class Program
 {
     private static readonly int _led1Pin = 18;
     private static readonly int _led2Pin = 24;
-    private static GpioController? _gpioController;
+    // private static GpioController? _gpioController;
     private static HttpClient _httpClient = new HttpClient();
     private static SpeechSynthesizer? _speechSynthesizer;
     private static ChatGPTClient? _chatGPTClient;
@@ -39,11 +39,11 @@ partial class Program
         {
             var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Development";
             // Initialize GPIO
-            _gpioController = new GpioController();
-            _gpioController.OpenPin(_led1Pin, PinMode.Output);
-            _gpioController.OpenPin(_led2Pin, PinMode.Output);
-            _gpioController.Write(_led1Pin, PinValue.Low);
-            _gpioController.Write(_led2Pin, PinValue.Low);
+            // _gpioController = new GpioController();
+            // _gpioController.OpenPin(_led1Pin, PinMode.Output);
+            // _gpioController.OpenPin(_led2Pin, PinMode.Output);
+            // _gpioController.Write(_led1Pin, PinValue.Low);
+            // _gpioController.Write(_led2Pin, PinValue.Low);
 
             // Load configuration
             var builder = new ConfigurationBuilder()
@@ -79,14 +79,18 @@ partial class Program
             var baseAddress = Configuration["BASE_URL"] ?? "https://api.openai.com/v1/";
             var whisperApiUrl = Configuration["WHISPER_API_URL"] ?? "https://api.whisper.ai/v1/convert";
             var whisperModel = Configuration["WHISPER_MODEL"] ?? "whisper-1";
+            var awsAccessKeyId = Configuration["AWS_ACCESS_KEY_ID"] ?? "AWS_ACCESS_KEY_ID";
+            var awsSecretAccessKey = Configuration["AWS_SECRET_ACCESS_KEY"] ?? "AWS_SECRET_ACCESS_KEY";
             // Initialize ChatGPTClient
             _chatGPTClient = new ChatGPTClient(baseAddress, openaiApiKey, gptModel);
 
             // Initialize SpeechSynthesizer
-            _speechSynthesizer = new SpeechSynthesizer("your-aws-access-key-id", "your-aws-secret-access-key", Amazon.RegionEndpoint.USEast1);
+            _speechSynthesizer = new SpeechSynthesizer(awsAccessKeyId, awsSecretAccessKey, Amazon.RegionEndpoint.USEast1);
 
             // Initialize PicovoiceHandler
-            _picovoiceHandler = new PicovoiceHandler(pvAccessKey, _led1Pin, _led2Pin, _gpioController);
+            _picovoiceHandler = new PicovoiceHandler(pvAccessKey, _led1Pin, _led2Pin
+            // , _gpioController
+            );
             _picovoiceHandler.WakeWordDetected += OnWakeWordDetected;
             _picovoiceHandler.Start();
 
@@ -150,7 +154,7 @@ partial class Program
                 await _speechSynthesizer.SynthesizeSpeechAsync(response);
 
             // Fade LEDs
-            await FadeLedsAsync(fadeIn: false);
+            // await FadeLedsAsync(fadeIn: false);
             Console.WriteLine($"Response has been spoken: {response}");
 
             // Synthesize the response to speech
@@ -160,11 +164,11 @@ partial class Program
             Console.WriteLine("Response has been spoken.");
 
             // Reset GPIO
-            if (_gpioController != null)
-            {
-                _gpioController.Write(_led1Pin, PinValue.Low);
-                _gpioController.Write(_led2Pin, PinValue.Low);
-            }
+            // if (_gpioController != null)
+            // {
+            //     _gpioController.Write(_led1Pin, PinValue.Low);
+            //     _gpioController.Write(_led2Pin, PinValue.Low);
+            // }
         }
         catch (HttpRequestException httpEx)
         {
@@ -183,17 +187,17 @@ partial class Program
         }
     }
 
-    private static async Task FadeLedsAsync(bool fadeIn = true)
-    {
-        try
-        {
-            using var pwmController = _gpioController != null ? new PwmController(_gpioController, _led1Pin) : throw new Exception("_gpioController is null.");
-            await pwmController.FadeAsync(2000, fadeIn); // Fade duration in milliseconds
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"An error occurred while fading LEDs: {ex.Message}");
-            // Handle exceptions related to PWM control
-        }
-    }
+    // private static async Task FadeLedsAsync(bool fadeIn = true)
+    // {
+    //     try
+    //     {
+    //         using var pwmController = _gpioController != null ? new PwmController(_gpioController, _led1Pin) : throw new Exception("_gpioController is null.");
+    //         await pwmController.FadeAsync(2000, fadeIn); // Fade duration in milliseconds
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         Console.WriteLine($"An error occurred while fading LEDs: {ex.Message}");
+    //         // Handle exceptions related to PWM control
+    //     }
+    // }
 }

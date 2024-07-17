@@ -8,7 +8,7 @@ public class PicovoiceHandler
     private readonly string _accessKey;
     private readonly int _led1Pin;
     private readonly int _led2Pin;
-    private readonly GpioController _gpioController;
+    // private readonly GpioController _gpioController;
     private Picovoice? _picovoice;
     private CancellationTokenSource? _cancellationTokenSource;
     private Task? _listeningTask;
@@ -17,12 +17,14 @@ public class PicovoiceHandler
 
     public event Func<Task> WakeWordDetected = () => Task.CompletedTask;
 
-    public PicovoiceHandler(string accessKey, int led1Pin, int led2Pin, GpioController gpioController)
+    public PicovoiceHandler(string accessKey, int led1Pin, int led2Pin
+    // , GpioController gpioController
+    )
     {
         _accessKey = accessKey;
         _led1Pin = led1Pin;
         _led2Pin = led2Pin;
-        _gpioController = gpioController;
+        // _gpioController = gpioController;
     }
 
     public void Start()
@@ -69,18 +71,18 @@ public class PicovoiceHandler
         }
     }
 
-    public async Task FadeLedsAsync()
-    {
-        if (_pwmController1 == null || _pwmController2 == null)
-        {
-            _pwmController1 = new PwmController(_gpioController, _led1Pin);
-            _pwmController2 = new PwmController(_gpioController, _led2Pin);
-        }
+    // public async Task FadeLedsAsync()
+    // {
+    //     if (_pwmController1 == null || _pwmController2 == null)
+    //     {
+    //         _pwmController1 = new PwmController(_gpioController, _led1Pin);
+    //         _pwmController2 = new PwmController(_gpioController, _led2Pin);
+    //     }
 
-        // Perform fade out
-        await _pwmController1.FadeAsync(2000); // Fade duration in milliseconds
-        await _pwmController2.FadeAsync(2000); // Fade duration in milliseconds
-    }
+    //     // Perform fade out
+    //     await _pwmController1.FadeAsync(2000); // Fade duration in milliseconds
+    //     await _pwmController2.FadeAsync(2000); // Fade duration in milliseconds
+    // }
 
     public void Stop()
     {
