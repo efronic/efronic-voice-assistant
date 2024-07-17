@@ -17,7 +17,8 @@ public class WhisperClient
         _apiKey = apiKey;
         _model = model;
     }
-
+    
+    // convert vocal data to text using the Whisper API
     public async Task<string> ConvertPcmToTextAsync(short[] pcmData)
     {
         byte[] byteData = ConvertPcmToByteArray(pcmData);

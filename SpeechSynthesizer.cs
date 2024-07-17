@@ -5,6 +5,7 @@ using System;
 using System.IO;
 using System.Threading.Tasks;
 
+// converts text to speech using Amazon Polly
 public class SpeechSynthesizer
 {
     private readonly AmazonPollyClient _pollyClient;
@@ -30,22 +31,22 @@ public class SpeechSynthesizer
             synthesizeSpeechResponse.AudioStream.CopyTo(memoryStream);
             memoryStream.Seek(0, SeekOrigin.Begin);
 
-            // using (var waveStream = new Mp3FileReader(memoryStream))
-            // using (var waveOut = new WaveOutEvent())
-            // {
-            //     waveOut.Init(waveStream);
-            //     waveOut.Play();
-
-            //     while (waveOut.PlaybackState == PlaybackState.Playing)
-            //     {
-            //         await Task.Delay(100);
-            //     }
-            // }
-            using (var fileStream = File.Create(filePath))
+            using (var waveStream = new Mp3FileReader(memoryStream))
+            using (var waveOut = new WaveOutEvent())
             {
-                synthesizeSpeechResponse.AudioStream.CopyTo(fileStream);
-                fileStream.Flush();
+                waveOut.Init(waveStream);
+                waveOut.Play();
+
+                while (waveOut.PlaybackState == PlaybackState.Playing)
+                {
+                    await Task.Delay(100);
+                }
             }
+            // using (var fileStream = File.Create(filePath))
+            // {
+            //     synthesizeSpeechResponse.AudioStream.CopyTo(fileStream);
+            //     fileStream.Flush();
+            // }
         }
     }
 }

@@ -59,12 +59,13 @@ public class AudioRecorder
         }
         return true;
     }
-    public async Task MonitorSilence()
+    public async Task StopIfSilenceDetected()
     {
         while (!IsSilent())
         {
             await Task.Delay(100); // Check every 100ms for silence
         }
+        Stop();
     }
     public short[] GetPcmData()
     {

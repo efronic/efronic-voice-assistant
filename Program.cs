@@ -13,15 +13,15 @@ partial class Program
 {
     private static readonly int _led1Pin = 18;
     private static readonly int _led2Pin = 24;
-    private static GpioController _gpioController;
+    private static GpioController? _gpioController;
     private static HttpClient _httpClient = new HttpClient();
-    private static SpeechSynthesizer _speechSynthesizer;
-    private static ChatGPTClient _chatGPTClient;
-    private static AudioRecorder _recorder;
-    private static AudioPlayer _audioPlayer;
-    private static PicovoiceHandler _picovoiceHandler;
-    private static WhisperClient _whisperClient;
-    public static IConfiguration Configuration { get; private set; }
+    private static SpeechSynthesizer? _speechSynthesizer;
+    private static ChatGPTClient? _chatGPTClient;
+    private static AudioRecorder? _recorder;
+    // private static AudioPlayer _audioPlayer;
+    private static PicovoiceHandler? _picovoiceHandler;
+    private static WhisperClient? _whisperClient;
+    public static IConfiguration? Configuration { get; private set; }
     private static readonly string[] _prompts = {
         "How may I assist you?",
         "How may I help?",
@@ -90,9 +90,9 @@ partial class Program
             _picovoiceHandler.WakeWordDetected += OnWakeWordDetected;
             _picovoiceHandler.Start();
 
-            // Initialize Recorder and AudioPlayer
+            // Initialize Recorder
             _recorder = new AudioRecorder();
-            _audioPlayer = new AudioPlayer();
+            // _audioPlayer = new AudioPlayer();
             _whisperClient = new WhisperClient(whisperApiUrl, openaiApiKey, whisperModel);
             // Main loop to keep the application running
             Console.WriteLine("Application started. Press Ctrl+C to exit.");
@@ -123,37 +123,48 @@ partial class Program
             Console.WriteLine($"Prompt: {prompt}");
 
             // Synthesize the prompt to speech
-            await _speechSynthesizer.SynthesizeSpeechAsync(prompt);
+            if (_speechSynthesizer != null)
+                await _speechSynthesizer.SynthesizeSpeechAsync(prompt);
 
             // Start recording and detect voice
-            _recorder.Start();
+            _recorder?.Start();
 
             // Simulate listening for voice commands
-            await Task.Delay(5000); // Replace with actual listening logic
-            _recorder.Stop();
+            // await Task.Delay(5000); // Replace with actual listening logic
+
+            // Wait for silence to detect end of speech
+            if (_recorder != null)
+                await _recorder.StopIfSilenceDetected();
+            // _recorder.Stop();
 
             // Process the recording
-            short[] pcmData = _recorder.GetPcmData();
-            string transcript = await _whisperClient.ConvertPcmToTextAsync(pcmData); // This should be replaced with actual speech-to-text result
+            short[] pcmData = _recorder?.GetPcmData() ?? throw new Exception("Recorder is null.");
+            string transcript = _whisperClient != null ? await _whisperClient.ConvertPcmToTextAsync(pcmData) : throw new Exception("Whisper client is null."); // This should be replaced with actual speech-to-text result
 
             // Get a response from ChatGPT
-            string response = await _chatGPTClient.GetResponseAsync(transcript);
+            string response = _chatGPTClient != null ? await _chatGPTClient.GetResponseAsync(transcript) : throw new Exception("ChatGPTClient is null.");
 
             // Play the response
-            _audioPlayer.PlayMp3("speech.mp3");
+            // _audioPlayer.PlayMp3("speech.mp3");
+            if (_speechSynthesizer != null)
+                await _speechSynthesizer.SynthesizeSpeechAsync(response);
 
             // Fade LEDs
-            await FadeLedsAsync();
+            await FadeLedsAsync(fadeIn: false);
             Console.WriteLine($"Response has been spoken: {response}");
 
             // Synthesize the response to speech
-            await _speechSynthesizer.SynthesizeSpeechAsync(response);
+            if (_speechSynthesizer != null)
+                await _speechSynthesizer.SynthesizeSpeechAsync(response);
 
             Console.WriteLine("Response has been spoken.");
 
             // Reset GPIO
-            _gpioController.Write(_led1Pin, PinValue.Low);
-            _gpioController.Write(_led2Pin, PinValue.Low);
+            if (_gpioController != null)
+            {
+                _gpioController.Write(_led1Pin, PinValue.Low);
+                _gpioController.Write(_led2Pin, PinValue.Low);
+            }
         }
         catch (HttpRequestException httpEx)
         {
@@ -172,12 +183,12 @@ partial class Program
         }
     }
 
-    private static async Task FadeLedsAsync()
+    private static async Task FadeLedsAsync(bool fadeIn = true)
     {
         try
         {
-            using var pwmController = new PwmController(_gpioController, _led1Pin);
-            await pwmController.FadeAsync(2000); // Fade duration in milliseconds
+            using var pwmController = _gpioController != null ? new PwmController(_gpioController, _led1Pin) : throw new Exception("_gpioController is null.");
+            await pwmController.FadeAsync(2000, fadeIn); // Fade duration in milliseconds
         }
         catch (Exception ex)
         {
