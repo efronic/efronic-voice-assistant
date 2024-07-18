@@ -17,7 +17,7 @@ partial class Program
     private static HttpClient _httpClient = new HttpClient();
     private static SpeechSynthesizer? _speechSynthesizer;
     private static ChatGPTClient? _chatGPTClient;
-    private static AudioRecorder? _recorder;
+    private static SpeechToTextController? _speechToTextController;
     // private static AudioPlayer _audioPlayer;
     private static PicovoiceHandler? _picovoiceHandler;
     private static WhisperClient? _whisperClient;
@@ -55,22 +55,22 @@ partial class Program
 
             Configuration = builder.Build();
 
-            var host = Host.CreateDefaultBuilder(args)
-                        .ConfigureServices((context, services) =>
-                        {
-                            services.AddSingleton<IConfiguration>(Configuration);
-                            services.AddSingleton<ConfigurationReloader>();
-                        })
-                        .ConfigureLogging(logging =>
-                        {
-                            logging.AddConsole();
-                        })
-                        .Build();
+            // var host = Host.CreateDefaultBuilder(args)
+            //             .ConfigureServices((context, services) =>
+            //             {
+            //                 services.AddSingleton<IConfiguration>(Configuration);
+            //                 services.AddSingleton<ConfigurationReloader>();
+            //             })
+            //             .ConfigureLogging(logging =>
+            //             {
+            //                 logging.AddConsole();
+            //             })
+            //             .Build();
 
-            var configReloader = host.Services.GetRequiredService<ConfigurationReloader>();
-            configReloader.StartListening();
+            // var configReloader = host.Services.GetRequiredService<ConfigurationReloader>();
+            // configReloader.StartListening();
 
-            await host.RunAsync();
+            // await host.RunAsync();
 
 
             var openaiApiKey = Configuration["OPENAI_API_KEY"] ?? "OPENAI_API_KEY";
@@ -81,6 +81,26 @@ partial class Program
             var whisperModel = Configuration["WHISPER_MODEL"] ?? "whisper-1";
             var awsAccessKeyId = Configuration["AWS_ACCESS_KEY_ID"] ?? "AWS_ACCESS_KEY_ID";
             var awsSecretAccessKey = Configuration["AWS_SECRET_ACCESS_KEY"] ?? "AWS_SECRET_ACCESS_KEY";
+            int cheetahAudioDeviceIndex;
+            if (!int.TryParse(Configuration["CHEETAH_AUDIO_DEVICE_INDEX"], out cheetahAudioDeviceIndex))
+            {
+                cheetahAudioDeviceIndex = -1; // Default value if parsing fails
+            }
+            var cheetahAccessKey = Configuration["CHEETAH_ACCESS_KEY"] ?? "";
+            var cheetahModelPath = Configuration["CHEETAH_MODEL_PATH"] ?? "";
+            float cheetahEndpointDurationSec;
+            if (!float.TryParse(Configuration["CHEETAH_ENDPOINT_DURATION_SEC"], out cheetahEndpointDurationSec))
+            {
+                cheetahEndpointDurationSec = 3.0f; // Default value if parsing fails
+            }
+            bool cheetahEnableAutomaticPunctuation;
+            if (!bool.TryParse(Configuration["CHEETAH_ENABLE_AUTOMATIC_PUNCTUATION"], out cheetahEnableAutomaticPunctuation))
+            {
+                cheetahEnableAutomaticPunctuation = true; // Default value if parsing fails
+            }
+            var keywordPaths = new List<string> { "./Hey-Wiz_en_windows_v3_0_0.ppn" }; // Add your keyword paths
+            var sensitivities = new List<float> { 0.5f }; // Adjust sensitivities as needed
+            int audioDeviceIndex = -1; // Default audio device index
             // Initialize ChatGPTClient
             _chatGPTClient = new ChatGPTClient(baseAddress, openaiApiKey, gptModel);
 
@@ -88,14 +108,12 @@ partial class Program
             _speechSynthesizer = new SpeechSynthesizer(awsAccessKeyId, awsSecretAccessKey, Amazon.RegionEndpoint.USEast1);
 
             // Initialize PicovoiceHandler
-            _picovoiceHandler = new PicovoiceHandler(pvAccessKey, _led1Pin, _led2Pin
-            // , _gpioController
-            );
+            _picovoiceHandler = new PicovoiceHandler(pvAccessKey, _led1Pin, _led2Pin, keywordPaths, sensitivities, audioDeviceIndex);
             _picovoiceHandler.WakeWordDetected += OnWakeWordDetected;
             _picovoiceHandler.Start();
 
             // Initialize Recorder
-            _recorder = new AudioRecorder();
+            _speechToTextController = new SpeechToTextController(cheetahAccessKey, cheetahModelPath, cheetahEndpointDurationSec, cheetahEnableAutomaticPunctuation, 1);
             // _audioPlayer = new AudioPlayer();
             _whisperClient = new WhisperClient(whisperApiUrl, openaiApiKey, whisperModel);
             // Main loop to keep the application running
@@ -130,36 +148,45 @@ partial class Program
             if (_speechSynthesizer != null)
                 await _speechSynthesizer.SynthesizeSpeechAsync(prompt);
 
-            // Start recording and detect voice
-            _recorder?.Start();
+            // Converting speech to text
+            string? transcript = _speechToTextController?.SpeechToText();
 
             // Simulate listening for voice commands
             // await Task.Delay(5000); // Replace with actual listening logic
 
             // Wait for silence to detect end of speech
-            if (_recorder != null)
-                await _recorder.StopIfSilenceDetected();
+            // if (_speechToText != null)
+            //     await _speechToText.StopIfSilenceDetected();
             // _recorder.Stop();
 
             // Process the recording
-            short[] pcmData = _recorder?.GetPcmData() ?? throw new Exception("Recorder is null.");
-            string transcript = _whisperClient != null ? await _whisperClient.ConvertPcmToTextAsync(pcmData) : throw new Exception("Whisper client is null."); // This should be replaced with actual speech-to-text result
+            // short[] pcmData = _speechToTextController?.GetPcmData() ?? throw new Exception("Recorder is null.");
+            // string transcript = _whisperClient != null ? await _whisperClient.ConvertPcmToTextAsync(pcmData) : throw new Exception("Whisper client is null."); // This should be replaced with actual speech-to-text result
+
+
 
             // Get a response from ChatGPT
-            string response = _chatGPTClient != null ? await _chatGPTClient.GetResponseAsync(transcript) : throw new Exception("ChatGPTClient is null.");
+            string? gptResponse = null;
+            if (transcript != null)
+                gptResponse = _chatGPTClient != null ? await _chatGPTClient.GetResponseAsync(transcript) : throw new Exception("ChatGPTClient is null.");
+            else throw new Exception("Transcript is null.");
 
             // Play the response
             // _audioPlayer.PlayMp3("speech.mp3");
-            if (_speechSynthesizer != null)
-                await _speechSynthesizer.SynthesizeSpeechAsync(response);
+            if (_speechSynthesizer != null && gptResponse != null)
+                await _speechSynthesizer.SynthesizeSpeechAsync(gptResponse);
+            else
+                throw new Exception("SpeechSynthesizer or GPT response is null.");
 
             // Fade LEDs
             // await FadeLedsAsync(fadeIn: false);
-            Console.WriteLine($"Response has been spoken: {response}");
+            Console.WriteLine($"Response has been spoken: {gptResponse}");
 
             // Synthesize the response to speech
-            if (_speechSynthesizer != null)
-                await _speechSynthesizer.SynthesizeSpeechAsync(response);
+            if (_speechSynthesizer != null && gptResponse != null)
+                await _speechSynthesizer.SynthesizeSpeechAsync(gptResponse);
+            else
+                throw new Exception("SpeechSynthesizer or GPT response is null.");
 
             Console.WriteLine("Response has been spoken.");
 

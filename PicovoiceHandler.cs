@@ -1,6 +1,8 @@
 using System;
-using System.Device.Gpio;
-using System.Threading.Tasks;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Threading;
 using Pv;
 
 public class PicovoiceHandler
@@ -10,66 +12,66 @@ public class PicovoiceHandler
     private readonly int _led2Pin;
     // private readonly GpioController _gpioController;
     private Picovoice? _picovoice;
-    private CancellationTokenSource? _cancellationTokenSource;
-    private Task? _listeningTask;
-    private PwmController? _pwmController1;
-    private PwmController? _pwmController2;
+    private readonly List<string> _keywordPaths;
+    private readonly List<float> _sensitivities;
+    private readonly int _audioDeviceIndex;
+    private bool _isRunning;
 
-    public event Func<Task> WakeWordDetected = () => Task.CompletedTask;
+    public event Func<Task> WakeWordDetected;
 
-    public PicovoiceHandler(string accessKey, int led1Pin, int led2Pin
-    // , GpioController gpioController
-    )
+    public PicovoiceHandler(string accessKey, int led1Pin, int led2Pin, List<string> keywordPaths, List<float> sensitivities, int audioDeviceIndex)
     {
         _accessKey = accessKey;
         _led1Pin = led1Pin;
         _led2Pin = led2Pin;
-        // _gpioController = gpioController;
+        _keywordPaths = keywordPaths;
+        _sensitivities = sensitivities;
+        _audioDeviceIndex = audioDeviceIndex;
     }
 
     public void Start()
     {
-        _cancellationTokenSource = new CancellationTokenSource();
-        _listeningTask = Task.Run(() => ListenForWakeWord(_cancellationTokenSource.Token));
-        Console.WriteLine("PicovoiceHandler started.");
+        _isRunning = true;
+        Task.Run(() => ListenForWakeWord());
     }
-
-    private async Task ListenForWakeWord(CancellationToken cancellationToken)
+    public void Stop()
     {
-        using (Porcupine porcupine = Porcupine.FromKeywordPaths(_accessKey, new string[] { "path/to/keyword.ppn" }, "path/to/model.pv", new float[] { 0.5f }))
+        _isRunning = false;
+    }
+    private async Task ListenForWakeWord()
+    {
+        using (Porcupine porcupine = Porcupine.FromKeywordPaths(_accessKey, _keywordPaths, sensitivities: _sensitivities))
         {
-            using (PvRecorder recorder = PvRecorder.Create(frameLength: porcupine.FrameLength, deviceIndex: -1))
+            using (PvRecorder recorder = PvRecorder.Create(frameLength: porcupine.FrameLength, deviceIndex: _audioDeviceIndex))
             {
                 recorder.Start();
-                Console.WriteLine("Listening for wake word...");
-
-                while (!cancellationToken.IsCancellationRequested)
+                while (_isRunning)
                 {
                     short[] frame = recorder.Read();
                     int result = porcupine.Process(frame);
                     if (result >= 0)
                     {
-                        Console.WriteLine("Wake word detected.");
+                        Console.WriteLine($"[{DateTime.Now.ToLongTimeString()}] Detected '{Path.GetFileNameWithoutExtension(_keywordPaths[result])}'");
                         if (WakeWordDetected != null)
                         {
                             await WakeWordDetected.Invoke();
                         }
                     }
+                    Thread.Yield();
                 }
-
                 recorder.Stop();
             }
         }
     }
-    private async Task OnWakeWordDetected()
-    {
-        // Simulate wake word detection event
-        Console.WriteLine("Wake word detected.");
-        if (WakeWordDetected != null)
-        {
-            await WakeWordDetected.Invoke();
-        }
-    }
+    // private async Task OnWakeWordDetected()
+    // {
+    //     // Simulate wake word detection event
+    //     Console.WriteLine("Wake word detected.");
+    //     if (WakeWordDetected != null)
+    //     {
+    //         await WakeWordDetected.Invoke();
+    //     }
+    // }
 
     // public async Task FadeLedsAsync()
     // {
@@ -84,19 +86,19 @@ public class PicovoiceHandler
     //     await _pwmController2.FadeAsync(2000); // Fade duration in milliseconds
     // }
 
-    public void Stop()
-    {
-        if (_cancellationTokenSource != null)
-        {
-            _cancellationTokenSource.Cancel();
-            if (_listeningTask != null)
-            {
-                _listeningTask.Wait();
-            }
-            _cancellationTokenSource.Dispose();
-            _cancellationTokenSource = null!;
-            _listeningTask = null;
-        }
-        Console.WriteLine("PicovoiceHandler stopped.");
-    }
+    // public void Stop()
+    // {
+    //     if (_cancellationTokenSource != null)
+    //     {
+    //         _cancellationTokenSource.Cancel();
+    //         if (_listeningTask != null)
+    //         {
+    //             _listeningTask.Wait();
+    //         }
+    //         _cancellationTokenSource.Dispose();
+    //         _cancellationTokenSource = null!;
+    //         _listeningTask = null;
+    //     }
+    //     Console.WriteLine("PicovoiceHandler stopped.");
+    // }
 }
