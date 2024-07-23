@@ -2,6 +2,7 @@ using Amazon.Polly;
 using Amazon.Polly.Model;
 // using NAudio.Wave;
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
 
@@ -21,32 +22,37 @@ public class SpeechSynthesizer
         {
             Text = text,
             OutputFormat = OutputFormat.Mp3,
-            VoiceId = VoiceId.Ruth
+            VoiceId = VoiceId.Ruth,
+            Engine = Engine.Generative
         };
 
-        var synthesizeSpeechResponse = await _pollyClient.SynthesizeSpeechAsync(synthesizeSpeechRequest);
+        try
+        {
+            var synthesizeSpeechResponse = await _pollyClient.SynthesizeSpeechAsync(synthesizeSpeechRequest);
 
-        // using (var memoryStream = new MemoryStream())
-        // {
-        //     synthesizeSpeechResponse.AudioStream.CopyTo(memoryStream);
-        //     memoryStream.Seek(0, SeekOrigin.Begin);
+            using (var fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write))
+            {
+                await synthesizeSpeechResponse.AudioStream.CopyToAsync(fileStream);
+                await fileStream.FlushAsync();
+            }
 
-        //     using (var waveStream = new Mp3FileReader(memoryStream))
-        //     using (var waveOut = new WaveOutEvent())
-        //     {
-        //         waveOut.Init(waveStream);
-        //         waveOut.Play();
-
-        //         while (waveOut.PlaybackState == PlaybackState.Playing)
-        //         {
-        //             await Task.Delay(100);
-        //         }
-        //     }
-        //     // using (var fileStream = File.Create(filePath))
-        //     // {
-        //     //     synthesizeSpeechResponse.AudioStream.CopyTo(fileStream);
-        //     //     fileStream.Flush();
-        //     // }
-        // }
+            // Play the audio file using Windows Media Player
+            var process = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = "wmplayer",
+                    Arguments = $"\"{filePath}\"",
+                    UseShellExecute = true, // UseShellExecute is true for launching external apps
+                    CreateNoWindow = true
+                }
+            };
+            process.Start();
+            process.WaitForExit();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"An error occurred: {ex.Message}");
+        }
     }
 }

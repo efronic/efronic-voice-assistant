@@ -40,27 +40,45 @@ public class PicovoiceHandler
     }
     private async Task ListenForWakeWord()
     {
-        using (Porcupine porcupine = Porcupine.FromKeywordPaths(_accessKey, _keywordPaths, sensitivities: _sensitivities))
+        try
         {
-            using (PvRecorder recorder = PvRecorder.Create(frameLength: porcupine.FrameLength, deviceIndex: _audioDeviceIndex))
+            using (Porcupine porcupine = Porcupine.FromKeywordPaths(_accessKey, _keywordPaths, sensitivities: _sensitivities))
             {
-                recorder.Start();
-                while (_isRunning)
+                try
                 {
-                    short[] frame = recorder.Read();
-                    int result = porcupine.Process(frame);
-                    if (result >= 0)
+                    using (PvRecorder recorder = PvRecorder.Create(frameLength: porcupine.FrameLength, deviceIndex: _audioDeviceIndex))
                     {
-                        Console.WriteLine($"[{DateTime.Now.ToLongTimeString()}] Detected '{Path.GetFileNameWithoutExtension(_keywordPaths[result])}'");
-                        if (WakeWordDetected != null)
+                        recorder.Start();
+                        while (_isRunning)
                         {
-                            await WakeWordDetected.Invoke();
+                            short[] frame = recorder.Read();
+                            int result = porcupine.Process(frame);
+                            if (result >= 0)
+                            {
+                                Console.WriteLine($"[{DateTime.Now.ToLongTimeString()}] Detected '{Path.GetFileNameWithoutExtension(_keywordPaths[result])}'");
+                                if (WakeWordDetected != null)
+                                {
+                                    await WakeWordDetected.Invoke();
+                                }
+                            }
+                            Thread.Yield();
                         }
+                        recorder.Stop();
                     }
-                    Thread.Yield();
                 }
-                recorder.Stop();
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error initializing or using PvRecorder: {ex.Message}");
+                }
             }
+        }
+        catch (PorcupineIOException pioEx)
+        {
+            Console.WriteLine($"Porcupine IO Exception: {pioEx.Message}. Please check your keyword paths and access key.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"An unexpected error occurred: {ex.Message}");
         }
     }
     // private async Task OnWakeWordDetected()

@@ -38,12 +38,25 @@ partial class Program
         try
         {
             var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Development";
-            var builder = new ConfigurationBuilder()
-                .SetBasePath(Directory.GetCurrentDirectory())
-                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-            .AddJsonFile($"appsettings.{environment}.json", optional: true, reloadOnChange: true)
-            .AddEnvironmentVariables();
-            Configuration = builder.Build();
+            try
+            {
+                var builder = new ConfigurationBuilder()
+                    .SetBasePath(Directory.GetCurrentDirectory())
+                    .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+                    .AddJsonFile($"appsettings.{environment}.json", optional: true, reloadOnChange: true)
+                    .AddEnvironmentVariables();
+                Configuration = builder.Build();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to load configuration: {ex.Message}");
+            }
+            Console.WriteLine($"efronic ASPNETCORE_ENVIRONMENT: {environment}");
+            Console.WriteLine("Configuration Loaded:");
+            foreach (var pair in Configuration.AsEnumerable())
+            {
+                Console.WriteLine($"{pair.Key}: {pair.Value}");
+            }
             var openaiApiKey = Configuration["OPENAI_API_KEY"] ?? "OPENAI_API_KEY";
             var gptModel = Configuration["GPT_MODEL"] ?? "gpt-3.5-turbo-16k";
             var pvAccessKey = Configuration["PV_ACCESS_KEY"] ?? "PV_ACCESS_KEY";
@@ -69,14 +82,14 @@ partial class Program
             {
                 cheetahEnableAutomaticPunctuation = true;
             }
-            var keywordPaths = new List<string> { "./Hey-Wiz_en_linux_v3_0_0.ppn" };
+            var keywordPaths = new List<string> { @"C:\Code\efronic-voice-assistant\Hey-Wiz_en_windows_v3_0_0.ppn" };
             var sensitivities = new List<float> { 0.5f };
             int audioDeviceIndex = -1;
 
-            // _chatGPTClient = new ChatGPTClient(baseAddress, openaiApiKey, gptModel);
+            _chatGPTClient = new ChatGPTClient(baseAddress, openaiApiKey, gptModel);
 
 
-            // _speechSynthesizer = new SpeechSynthesizer(awsAccessKeyId, awsSecretAccessKey, Amazon.RegionEndpoint.USEast1);
+            _speechSynthesizer = new SpeechSynthesizer(awsAccessKeyId, awsSecretAccessKey, Amazon.RegionEndpoint.USEast1);
 
 
             _picovoiceHandler = new PicovoiceHandler(pvAccessKey, _led1Pin, _led2Pin, keywordPaths, sensitivities, audioDeviceIndex);
@@ -84,9 +97,9 @@ partial class Program
             _picovoiceHandler.Start();
 
 
-            // _speechToTextController = new SpeechToTextController();
+            _speechToTextController = new SpeechToTextController();
 
-            // _whisperClient = new WhisperClient(whisperApiUrl, openaiApiKey, whisperModel);
+            _whisperClient = new WhisperClient(whisperApiUrl, openaiApiKey, whisperModel);
 
             Console.WriteLine("Application started. Press Ctrl+C to exit.");
             while (true)
@@ -120,7 +133,11 @@ partial class Program
                 await _speechSynthesizer.SynthesizeSpeechAsync(prompt);
 
 
-            string? transcript = await _speechToTextController?.SpeechToTextAsync(CancellationToken.None);
+            string? transcript = null;
+            if (_speechToTextController != null)
+            {
+                transcript = await _speechToTextController.SpeechToTextAsync(CancellationToken.None);
+            }
 
             string? gptResponse = null;
             if (transcript != null)

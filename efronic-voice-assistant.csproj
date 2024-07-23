@@ -12,6 +12,9 @@
     <None Update="appsettings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Update="appsettings.Development.json">
+    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+  </None>
     <PackageReference Include="AWSSDK.Polly" Version="3.7.304.12" />
     <PackageReference Include="CommunityToolkit.Maui" Version="9.0.2" />
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
