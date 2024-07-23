@@ -1,15 +1,19 @@
+using System;
 using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Net.Http.Json;
+using System.Diagnostics;
+using System.Threading;
 
 public class ChatGPTClient
 {
     private readonly HttpClient _httpClient;
     private readonly string _apiKey;
     private readonly string _model;
+    private readonly int _maxRetries;
 
-    public ChatGPTClient(string baseAddress, string apiKey, string model = "gpt-4")
+    public ChatGPTClient(string baseAddress, string apiKey, string model = "gpt-4", int maxRetries = 5)
     {
         _apiKey = apiKey;
         _httpClient = new HttpClient
@@ -18,47 +22,73 @@ public class ChatGPTClient
         };
         _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _apiKey);
         _model = model;
+        _maxRetries = maxRetries;
     }
 
     public async Task<string> GetResponseAsync(string userMessage)
     {
-        try
+        int retryCount = 0;
+        int initialDelay = 1000; // initial delay in milliseconds
+        int maxDelay = 32000; // maximum delay in milliseconds
+        Random random = new Random();
+
+        while (retryCount < _maxRetries)
         {
-            var requestBody = new
+            try
             {
-                model = _model,
-                messages = new[]
+                var requestBody = new
                 {
-                    new { role = "system", content = "You are a helpful assistant." },
-                    new { role = "user", content = userMessage }
-                },
-                max_tokens = 100
-            };
+                    model = _model,
+                    messages = new[]
+                    {
+                        new { role = "system", content = "You are a helpful assistant." },
+                        new { role = "user", content = userMessage }
+                    },
+                    max_tokens = 100
+                };
 
-            var response = await _httpClient.PostAsJsonAsync("v1/chat/completions", requestBody);
+                var response = await _httpClient.PostAsJsonAsync("chat/completions", requestBody);
 
-            response.EnsureSuccessStatusCode();
+                if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+                {
+                    Debug.WriteLine("Rate limit exceeded. No rate limit headers available.");
 
-            var responseString = await response.Content.ReadAsStringAsync();
-            var responseData = JsonSerializer.Deserialize<dynamic>(responseString);
-            if (responseData is not null)
-            {
-                return responseData.choices[0].message.content.ToString();
+                    // Calculate exponential backoff delay
+                    int delay = Math.Min(initialDelay * (int)Math.Pow(2, retryCount), maxDelay);
+                    delay += random.Next(100, 1000); // Add some randomness to delay
+
+                    retryCount++;
+                    Debug.WriteLine($"Retry {retryCount}: Waiting for {delay} milliseconds due to rate limiting.");
+                    await Task.Delay(delay);
+                    continue;
+                }
+
+                response.EnsureSuccessStatusCode();
+
+                var responseString = await response.Content.ReadAsStringAsync();
+                var responseData = JsonSerializer.Deserialize<dynamic>(responseString);
+                if (responseData is not null)
+                {
+                    Console.WriteLine($"responseData from openai: {responseData}");
+                    return responseData.choices[0].message.content.ToString();
+                }
+                else
+                {
+                    throw new ApplicationException("An error occurred while processing the response.");
+                }
             }
-            else
+            catch (HttpRequestException httpEx)
             {
-                throw new ApplicationException("An error occurred while processing the response.");
+                // Log and handle HTTP request errors
+                throw new ApplicationException("An error occurred while communicating with the OpenAI API.", httpEx);
+            }
+            catch (Exception ex)
+            {
+                // Log and handle other errors
+                throw new ApplicationException("An unexpected error occurred while processing the request.", ex);
             }
         }
-        catch (HttpRequestException httpEx)
-        {
-            // Log and handle HTTP request errors
-            throw new ApplicationException("An error occurred while communicating with the OpenAI API.", httpEx);
-        }
-        catch (Exception ex)
-        {
-            // Log and handle other errors
-            throw new ApplicationException("An unexpected error occurred while processing the request.", ex);
-        }
+
+        throw new ApplicationException("Exceeded the maximum number of retries.");
     }
 }

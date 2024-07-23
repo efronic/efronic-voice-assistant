@@ -71,7 +71,7 @@ partial class Program
                 cheetahAudioDeviceIndex = -1;
             }
             var cheetahAccessKey = Configuration["CHEETAH_ACCESS_KEY"] ?? "";
-            var cheetahModelPath = Configuration["CHEETAH_MODEL_PATH"] ?? "";
+            var cheetahModelPath = Configuration["CHEETAH_MODEL_PATH"] ?? null;
             float cheetahEndpointDurationSec;
             if (!float.TryParse(Configuration["CHEETAH_ENDPOINT_DURATION_SEC"], out cheetahEndpointDurationSec))
             {
@@ -97,7 +97,9 @@ partial class Program
             _picovoiceHandler.Start();
 
 
-            _speechToTextController = new SpeechToTextController();
+            // _speechToTextController = new SpeechToTextController();f
+            _speechToTextController = new SpeechToTextController(cheetahAccessKey, cheetahModelPath, cheetahEndpointDurationSec, cheetahEnableAutomaticPunctuation, 1);
+
 
             _whisperClient = new WhisperClient(whisperApiUrl, openaiApiKey, whisperModel);
 
@@ -136,7 +138,9 @@ partial class Program
             string? transcript = null;
             if (_speechToTextController != null)
             {
-                transcript = await _speechToTextController.SpeechToTextAsync(CancellationToken.None);
+                // transcript = await _speechToTextController.SpeechToTextAsync(CancellationToken.None);
+                transcript = _speechToTextController?.SpeechToText();
+
             }
 
             string? gptResponse = null;
