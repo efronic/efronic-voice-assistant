@@ -1,13 +1,4 @@
-﻿using System;
-using System.Device.Gpio;
-using System.Net.Http;
-using System.Threading.Tasks;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Configuration;
-using System.Net.Http.Headers;
-using System.IO;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Configuration;
 
 partial class Program
 {
@@ -17,8 +8,8 @@ partial class Program
     private static HttpClient _httpClient = new HttpClient();
     private static SpeechSynthesizer? _speechSynthesizer;
     private static ChatGPTClient? _chatGPTClient;
-    private static SpeechToTextController? _speechToTextController;
-
+    // private static SpeechToTextController? _speechToTextController;
+    private static MicToText? _micToText;
     private static PicovoiceHandler? _picovoiceHandler;
     private static WhisperClient? _whisperClient;
     public static IConfiguration? Configuration { get; private set; }
@@ -82,6 +73,11 @@ partial class Program
             {
                 cheetahEnableAutomaticPunctuation = true;
             }
+            var options = Configuration.GetSection("Options").Get<Options>();
+            foreach (var prop in options.GetType().GetProperties())
+            {
+                Console.WriteLine($"{prop.Name}: {prop.GetValue(options)}");
+            }
             var keywordPaths = new List<string> { @"C:\Code\efronic-voice-assistant\Hey-Wiz_en_windows_v3_0_0.ppn" };
             var sensitivities = new List<float> { 0.5f };
             int audioDeviceIndex = -1;
@@ -98,7 +94,7 @@ partial class Program
 
 
             // _speechToTextController = new SpeechToTextController();f
-            _speechToTextController = new SpeechToTextController(cheetahAccessKey, cheetahModelPath, cheetahEndpointDurationSec, cheetahEnableAutomaticPunctuation, 1);
+            _micToText = new MicToText(options.Encoder, options.Decoder, options.Joiner, options.Tokens);
 
 
             _whisperClient = new WhisperClient(whisperApiUrl, openaiApiKey, whisperModel);
@@ -136,17 +132,19 @@ partial class Program
 
 
             string? transcript = null;
-            if (_speechToTextController != null)
+            if (_micToText != null)
             {
                 // transcript = await _speechToTextController.SpeechToTextAsync(CancellationToken.None);
-                transcript = _speechToTextController?.SpeechToText();
+                // transcript = _speechToTextController?.SpeechToText();
+                MicToText._isRecording = true;
+                transcript = _micToText.MTT();
 
             }
 
             string? gptResponse = null;
-            if (transcript != null)
+            if (transcript != null && transcript != "")
                 gptResponse = _chatGPTClient != null ? await _chatGPTClient.GetResponseAsync(transcript) : throw new Exception("ChatGPTClient is null.");
-            else throw new Exception("Transcript is null.");
+            else throw new Exception("Transcript from MicToText is null or empty.");
 
 
 

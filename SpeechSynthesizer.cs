@@ -1,12 +1,10 @@
 using Amazon.Polly;
 using Amazon.Polly.Model;
-// using NAudio.Wave;
 using System;
 using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
 
-// converts text to speech using Amazon Polly
 public class SpeechSynthesizer
 {
     private readonly AmazonPollyClient _pollyClient;
@@ -16,7 +14,7 @@ public class SpeechSynthesizer
         _pollyClient = new AmazonPollyClient(awsAccessKeyId, awsSecretAccessKey, region);
     }
 
-    public async Task SynthesizeSpeechAsync(string text , string filePath = "speech.mp3")
+    public async Task SynthesizeSpeechAsync(string text, string filePath = "speech.mp3")
     {
         var synthesizeSpeechRequest = new SynthesizeSpeechRequest
         {
@@ -36,14 +34,16 @@ public class SpeechSynthesizer
                 await fileStream.FlushAsync();
             }
 
-            // Play the audio file using Windows Media Player
+            // Play the audio file using mpg123
             var process = new Process
             {
                 StartInfo = new ProcessStartInfo
                 {
-                    FileName = "wmplayer",
+                    FileName = "mpg123",
                     Arguments = $"\"{filePath}\"",
-                    UseShellExecute = true, // UseShellExecute is true for launching external apps
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
                     CreateNoWindow = true
                 }
             };

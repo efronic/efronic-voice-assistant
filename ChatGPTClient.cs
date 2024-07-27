@@ -66,11 +66,11 @@ public class ChatGPTClient
                 response.EnsureSuccessStatusCode();
 
                 var responseString = await response.Content.ReadAsStringAsync();
-                var responseData = JsonSerializer.Deserialize<dynamic>(responseString);
-                if (responseData is not null)
+                var responseData = JsonSerializer.Deserialize<OpenAIResponse>(responseString);
+                if (responseData != null && responseData.choices != null && responseData.choices.Length > 0)
                 {
                     Console.WriteLine($"responseData from openai: {responseData}");
-                    return responseData.choices[0].message.content.ToString();
+                    return responseData.choices[0].message.content;
                 }
                 else
                 {
@@ -91,4 +91,18 @@ public class ChatGPTClient
 
         throw new ApplicationException("Exceeded the maximum number of retries.");
     }
+}
+public class OpenAIResponse
+{
+    public Choice[] choices { get; set; }
+}
+
+public class Choice
+{
+    public Message message { get; set; }
+}
+
+public class Message
+{
+    public string content { get; set; }
 }

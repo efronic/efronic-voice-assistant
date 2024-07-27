@@ -1,5 +1,4 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net8.0</TargetFramework>
@@ -7,26 +6,29 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
-
   <ItemGroup>
     <None Update="appsettings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Update="appsettings.Development.json">
-    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-  </None>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="models/**">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <PackageReference Include="AWSSDK.Polly" Version="3.7.304.12" />
-    <PackageReference Include="CommunityToolkit.Maui" Version="9.0.2" />
+    <PackageReference Include="CommandLineParser" Version="2.9.1" />
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="8.0.0" />
+    <PackageReference Include="org.k2fsa.sherpa.onnx" Version="1.10.17" />
     <PackageReference Include="Picovoice" Version="3.0.2" />
     <PackageReference Include="Picovoice.Cheetah" Version="2.0.1" />
     <PackageReference Include="Porcupine" Version="3.0.2" />
+    <PackageReference Include="PortAudioSharp2" Version="1.0.3" />
     <PackageReference Include="PvRecorder" Version="1.2.5" />
     <PackageReference Include="System.Device.Gpio" Version="3.2.0" />
   </ItemGroup>
-
 </Project>
