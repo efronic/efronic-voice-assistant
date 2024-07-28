@@ -33,13 +33,20 @@ public class SpeechSynthesizer
                 await synthesizeSpeechResponse.AudioStream.CopyToAsync(fileStream);
                 await fileStream.FlushAsync();
             }
+            string mpg123Path = "mpg123"; // Default for Unix-like systems
+            if (Environment.OSVersion.Platform == PlatformID.Win32NT)
+            {
+                // Adjust the path to where mpg123 is located on your Windows system
+                mpg123Path = "./models/mpg123.exe";
+            }
+
 
             // Play the audio file using mpg123
             var process = new Process
             {
                 StartInfo = new ProcessStartInfo
                 {
-                    FileName = "mpg123",
+                    FileName = mpg123Path,
                     Arguments = $"\"{filePath}\"",
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
