@@ -63,6 +63,7 @@ partial class Program
             }
             var cheetahAccessKey = Configuration["CHEETAH_ACCESS_KEY"] ?? "";
             var cheetahModelPath = Configuration["CHEETAH_MODEL_PATH"] ?? null;
+            var mpg123Path = Configuration["MPG123_PATH"] ?? "mpg123";
             float cheetahEndpointDurationSec;
             if (!float.TryParse(Configuration["CHEETAH_ENDPOINT_DURATION_SEC"], out cheetahEndpointDurationSec))
             {
@@ -85,7 +86,7 @@ partial class Program
             _chatGPTClient = new ChatGPTClient(baseAddress, openaiApiKey, gptModel);
 
 
-            _speechSynthesizer = new SpeechSynthesizer(awsAccessKeyId, awsSecretAccessKey, Amazon.RegionEndpoint.USEast1);
+            _speechSynthesizer = new SpeechSynthesizer(awsAccessKeyId, awsSecretAccessKey, Amazon.RegionEndpoint.USEast1, mpg123Path);
 
 
             _picovoiceHandler = new PicovoiceHandler(pvAccessKey, _led1Pin, _led2Pin, keywordPaths, sensitivities, audioDeviceIndex);

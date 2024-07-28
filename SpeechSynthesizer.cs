@@ -8,10 +8,12 @@ using System.Threading.Tasks;
 public class SpeechSynthesizer
 {
     private readonly AmazonPollyClient _pollyClient;
+    private string _mpg123Path;
 
-    public SpeechSynthesizer(string awsAccessKeyId, string awsSecretAccessKey, Amazon.RegionEndpoint region)
+    public SpeechSynthesizer(string awsAccessKeyId, string awsSecretAccessKey, Amazon.RegionEndpoint region, string mpg123PathAppSettings = "mpg123")
     {
         _pollyClient = new AmazonPollyClient(awsAccessKeyId, awsSecretAccessKey, region);
+        _mpg123Path = mpg123PathAppSettings;
     }
 
     public async Task SynthesizeSpeechAsync(string text, string filePath = "speech.mp3")
@@ -37,7 +39,7 @@ public class SpeechSynthesizer
             if (Environment.OSVersion.Platform == PlatformID.Win32NT)
             {
                 // Adjust the path to where mpg123 is located on your Windows system
-                mpg123Path = "./models/mpg123.exe";
+                mpg123Path = _mpg123Path;
             }
 
 
