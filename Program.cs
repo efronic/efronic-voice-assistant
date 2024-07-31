@@ -8,7 +8,7 @@ partial class Program
     private static HttpClient _httpClient = new HttpClient();
     private static SpeechSynthesizer? _speechSynthesizer;
     private static ChatGPTClient? _chatGPTClient;
-    // private static SpeechToTextController? _speechToTextController;
+    private static SpeechToTextController? _speechToTextController;
     private static MicToText? _micToText;
     private static PicovoiceHandler? _picovoiceHandler;
     private static WhisperClient? _whisperClient;
@@ -94,7 +94,9 @@ partial class Program
             _picovoiceHandler.Start();
 
 
-            // _speechToTextController = new SpeechToTextController();f
+            // _speechToTextController = new SpeechToTextController();
+            _speechToTextController = new SpeechToTextController(cheetahAccessKey, cheetahModelPath, cheetahEndpointDurationSec, cheetahEnableAutomaticPunctuation, 1);
+
             _micToText = new MicToText(options.Encoder, options.Decoder, options.Joiner, options.Tokens);
 
 
@@ -136,9 +138,9 @@ partial class Program
             if (_micToText != null)
             {
                 // transcript = await _speechToTextController.SpeechToTextAsync(CancellationToken.None);
-                // transcript = _speechToTextController?.SpeechToText();
-                MicToText._isRecording = true;
-                transcript = _micToText.MTT();
+                transcript = _speechToTextController?.SpeechToText();
+                // MicToText._isRecording = true;
+                // transcript = _micToText.MTT();
 
             }
 
@@ -146,18 +148,6 @@ partial class Program
             if (transcript != null && transcript != "")
                 gptResponse = _chatGPTClient != null ? await _chatGPTClient.GetResponseAsync(transcript) : throw new Exception("ChatGPTClient is null.");
             else throw new Exception("Transcript from MicToText is null or empty.");
-
-
-
-            if (_speechSynthesizer != null && gptResponse != null)
-                await _speechSynthesizer.SynthesizeSpeechAsync(gptResponse);
-            else
-                throw new Exception("SpeechSynthesizer or GPT response is null.");
-
-
-
-            Console.WriteLine($"Response has been spoken: {gptResponse}");
-
 
             if (_speechSynthesizer != null && gptResponse != null)
                 await _speechSynthesizer.SynthesizeSpeechAsync(gptResponse);

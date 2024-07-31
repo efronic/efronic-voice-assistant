@@ -56,8 +56,10 @@ public class SpeechSynthesizer
                     CreateNoWindow = true
                 }
             };
+            Console.WriteLine("Starting mpg123 process");
             process.Start();
             process.WaitForExit();
+            Console.WriteLine("mpg123 process exited");
         }
         catch (Exception ex)
         {
