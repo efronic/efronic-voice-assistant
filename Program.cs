@@ -7,7 +7,8 @@ partial class Program
 
     private static HttpClient _httpClient = new HttpClient();
     private static SpeechSynthesizer? _speechSynthesizer;
-    private static ChatGPTClient? _chatGPTClient;
+    // private static AIClient? _aiClient;
+    private static AIClient? _aiClient;
     private static SpeechToTextController? _speechToTextController;
     private static MicToText? _micToText;
     private static PicovoiceHandler? _picovoiceHandler;
@@ -21,7 +22,17 @@ partial class Program
         "Yes?",
         "I'm here.",
         "I'm listening.",
-        "What would you like me to do?"
+        "What would you like me to do?",
+        "How can I be of service?",
+        "What do you need?",
+        "How can I assist you today?",
+        "What can I help you with?",
+        "Ready when you are.",
+        "What do you have in mind?",
+        "How can I support you?",
+        "What would you like to know?",
+        "I'm here to help.",
+        "What can I do for you today?"
     };
 
     static async Task Main(string[] args)
@@ -48,10 +59,15 @@ partial class Program
             {
                 Console.WriteLine($"{pair.Key}: {pair.Value}");
             }
-            var openaiApiKey = Configuration["OPENAI_API_KEY"] ?? "OPENAI_API_KEY";
-            var gptModel = Configuration["GPT_MODEL"] ?? "gpt-3.5-turbo-16k";
+            var openAiApiKey = Configuration["OPENAI_API_KEY"] ?? "OPENAI_API_KEY";
+            var copilotApiKey = Configuration["MS_COPILOT_API_KEY_1"] ?? Configuration["MS_COPILOT_API_KEY_2"];
+            var openAiGptModel = Configuration["OPENAI_GPT_MODEL"] ?? "gpt-4";
+            var openAiEndpoint = Configuration["OPENAI_API_ENDPOINT"] ?? "chat/completions";
+            var copilotEndpoint = Configuration["MS_COPILOT_API_ENDPOINT"] ?? "https://efronic-voice-assistant.openai.azure.com/";
+            var copilotModel = Configuration["MS_COPILOT_GPT_MODEL"] ?? "gpt-4o";
             var pvAccessKey = Configuration["PV_ACCESS_KEY"] ?? "PV_ACCESS_KEY";
-            var baseAddress = Configuration["BASE_URL"] ?? "https://api.openai.com/v1/";
+            var openAiBaseAddress = Configuration["OPENAI_BASE_URL"] ?? "https://api.openai.com/v1/";
+            var copilotBaseAddress = Configuration["MS_COPILOT_BASE_URL"] ?? "https://efronic-voice-assistant.openai.azure.com/";
             var whisperApiUrl = Configuration["WHISPER_API_URL"] ?? "https://api.whisper.ai/v1/convert";
             var whisperModel = Configuration["WHISPER_MODEL"] ?? "whisper-1";
             var awsAccessKeyId = Configuration["AWS_ACCESS_KEY_ID"] ?? "AWS_ACCESS_KEY_ID";
@@ -83,8 +99,8 @@ partial class Program
             var sensitivities = new List<float> { 0.5f };
             int audioDeviceIndex = -1;
 
-            _chatGPTClient = new ChatGPTClient(baseAddress, openaiApiKey, gptModel);
-
+            _aiClient = new AIClient(openAiBaseAddress, openAiApiKey, openAiGptModel, openAiEndpoint);
+            // _aiClient = new AIClient(copilotBaseAddress, copilotApiKey, copilotModel, copilotEndpoint);
 
             _speechSynthesizer = new SpeechSynthesizer(awsAccessKeyId, awsSecretAccessKey, Amazon.RegionEndpoint.USEast1, mpg123Path);
 
@@ -100,7 +116,7 @@ partial class Program
             _micToText = new MicToText(options.Encoder, options.Decoder, options.Joiner, options.Tokens);
 
 
-            _whisperClient = new WhisperClient(whisperApiUrl, openaiApiKey, whisperModel);
+            _whisperClient = new WhisperClient(whisperApiUrl, openAiApiKey, whisperModel);
 
             Console.WriteLine("Application started. Press Ctrl+C to exit.");
             while (true)
@@ -141,12 +157,17 @@ partial class Program
                 transcript = _speechToTextController?.SpeechToText();
                 // MicToText._isRecording = true;
                 // transcript = _micToText.MTT();
+                Console.WriteLine($"Spoken transcript from mic.: {transcript}");
 
             }
 
             string? gptResponse = null;
             if (transcript != null && transcript != "")
-                gptResponse = _chatGPTClient != null ? await _chatGPTClient.GetResponseAsync(transcript) : throw new Exception("ChatGPTClient is null.");
+            {
+                gptResponse = _aiClient != null ? await _aiClient.GetResponseAsync(transcript) : throw new Exception("CopilotClient is null.");
+                // gptResponse = _aiClient != null ? await _aiClient.GetResponseAsync(transcript) : throw new Exception("ChatGPTClient is null.");
+                Console.WriteLine($"Response from AI: {gptResponse}");
+            }
             else throw new Exception("Transcript from MicToText is null or empty.");
 
             if (_speechSynthesizer != null && gptResponse != null)

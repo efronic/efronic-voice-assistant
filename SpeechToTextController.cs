@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Timers;
 using Pv;
 
 public class SpeechToTextController
@@ -17,6 +18,8 @@ public class SpeechToTextController
     private static bool _enableAutomaticPunctuation;
     private static float _endpointDurationSec;
     private const int SilenceThreshold = 100;
+    private System.Timers.Timer _silenceTimer;
+    private PvRecorder? _recorder;
 
     public SpeechToTextController(string accessKey,
             string modelPath,
@@ -30,7 +33,6 @@ public class SpeechToTextController
         _enableAutomaticPunctuation = enableAutomaticPunctuation;
         _audioDeviceIndex = audioDeviceIndex;
 
-
         // _waveIn = new WaveInEvent();
         // _waveIn.WaveFormat = new WaveFormat(16000, 1); // 16kHz, Mono
         // _waveIn.DataAvailable += OnDataAvailable;
@@ -39,6 +41,9 @@ public class SpeechToTextController
         _memoryStream = new MemoryStream();
         _audioBuffer = new List<byte>();
 
+        _silenceTimer = new System.Timers.Timer(10000); // 10 seconds
+        _silenceTimer.Elapsed += OnSilenceTimerElapsed;
+        _silenceTimer.AutoReset = false;
     }
 
     public string? SpeechToText()
@@ -54,93 +59,58 @@ public class SpeechToTextController
         {
 
             // create recorder
-            using (PvRecorder recorder = PvRecorder.Create(cheetah.FrameLength, _audioDeviceIndex.Value))
+            _recorder = PvRecorder.Create(cheetah.FrameLength, _audioDeviceIndex.Value);
+            Console.WriteLine($"Using device: {_recorder.SelectedDevice}");
+            Console.CancelKeyPress += delegate (object? sender, ConsoleCancelEventArgs e)
             {
-                Console.WriteLine($"Using device: {recorder.SelectedDevice}");
-                Console.CancelKeyPress += delegate (object? sender, ConsoleCancelEventArgs e)
-                {
-                    e.Cancel = true;
-                    recorder.Stop();
-                    Console.WriteLine("Stopping...");
-                };
-                var transcript = "";
+                e.Cancel = true;
+                _recorder.Stop();
+                Console.WriteLine("Stopping...");
+            };
+            var transcript = "";
 
-                recorder.Start();
-                Console.WriteLine(">>> Press `CTRL+C` to exit:\n");
+            _recorder.Start();
+            _silenceTimer.Start();
+            Console.WriteLine(">>> Press `CTRL+C` to exit:\n");
 
-                try
+            try
+            {
+                while (_recorder.IsRecording)
                 {
-                    while (recorder.IsRecording)
+                    short[] frame = _recorder.Read();
+
+                    CheetahTranscript result = cheetah.Process(frame);
+                    if (!string.IsNullOrEmpty(result.Transcript))
                     {
-                        short[] frame = recorder.Read();
-
-                        CheetahTranscript result = cheetah.Process(frame);
-                        if (!string.IsNullOrEmpty(result.Transcript))
-                        {
-                            Console.Write(result.Transcript);
-                            transcript += result.Transcript;
-                        }
-                        if (result.IsEndpoint)
-                        {
-                            CheetahTranscript finalTranscriptObj = cheetah.Flush();
-                            Console.WriteLine(finalTranscriptObj.Transcript);
-                            transcript += finalTranscriptObj.Transcript;
-                            recorder.Stop();
-                            break;
-                        }
-
+                        Console.Write(result.Transcript);
+                        transcript += result.Transcript;
+                        _silenceTimer.Stop(); // Stop the silence timer since we received audio
+                        _silenceTimer.Start(); // Restart the silence timer
+                    }
+                    if (result.IsEndpoint)
+                    {
+                        CheetahTranscript finalTranscriptObj = cheetah.Flush();
+                        Console.WriteLine(finalTranscriptObj.Transcript);
+                        transcript += finalTranscriptObj.Transcript;
+                        _recorder.Stop();
+                        break;
                     }
                 }
-                catch (CheetahActivationLimitException)
-                {
-                    Console.WriteLine($"AccessKey '{_accessKey}' has reached its processing limit.");
-                }
-                return transcript;
             }
+            catch (CheetahActivationLimitException)
+            {
+                Console.WriteLine($"AccessKey '{_accessKey}' has reached its processing limit.");
+            }
+            return transcript;
         }
     }
 
-    // public void Stop()
-    // {
-    //     // Stop recording logic
-    //     _waveIn.StopRecording();
-    // }
-    // private void OnDataAvailable(object sender, WaveInEventArgs e)
-    // {
-    //     _audioBuffer.AddRange(e.Buffer);
-    // }
-
-    // private void OnRecordingStopped(object sender, StoppedEventArgs e)
-    // {
-    //     _memoryStream.Write(_audioBuffer.ToArray(), 0, _audioBuffer.Count);
-    // }
-
-
-    // public bool IsSilent()
-    // {
-    //     short[] pcmData = GetPcmData();
-    //     foreach (var sample in pcmData)
-    //     {
-    //         if (Math.Abs(sample) > SilenceThreshold)
-    //         {
-    //             return false;
-    //         }
-    //     }
-    //     return true;
-    // }
-    // public async Task StopIfSilenceDetected()
-    // {
-    //     while (!IsSilent())
-    //     {
-    //         await Task.Delay(100); // Check every 100ms for silence
-    //     }
-    //     Stop();
-    // }
-    // public short[] GetPcmData()
-    // {
-    //     byte[] byteData = _audioBuffer.ToArray();
-    //     short[] pcmData = new short[byteData.Length / sizeof(short)];
-    //     Buffer.BlockCopy(byteData, 0, pcmData, 0, byteData.Length);
-    //     return pcmData;
-    // }
+    private void OnSilenceTimerElapsed(object sender, ElapsedEventArgs e)
+    {
+        Console.WriteLine("No speech detected for 5 seconds. Stopping...");
+        if (_recorder != null && _recorder.IsRecording)
+        {
+            _recorder.Stop();
+        }
+    }
 }
